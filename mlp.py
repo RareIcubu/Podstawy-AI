@@ -24,7 +24,6 @@ class MLP:
         self.weights = []
         self.biases = []
         
-        # Słowniki przechowujące funkcje (jak wskaźniki na funkcje w C)
         self._activation_funcs = {
             'relu': (self._relu, self._relu_derivative),
             'sigmoid': (self._sigmoid, self._sigmoid_derivative)
@@ -238,13 +237,21 @@ class MLP:
 
     def save_model(self, file_path):
         """Zapisuje wagi i biasy oraz konfigurację modelu do pliku .npz."""
+        num_layers = len(self.weights)
+        weights_to_save = np.empty(num_layers, dtype=object)
+        biases_to_save = np.empty(num_layers, dtype=object)
+        
+        for i in range(num_layers):
+            weights_to_save[i] = self.weights[i]
+            biases_to_save[i] = self.biases[i]
+
         np.savez(file_path, 
-                 weights=self.weights, 
-                 biases=self.biases,
+                 weights=weights_to_save, 
+                 biases=biases_to_save,
                  layer_sizes=self.layer_sizes,
                  activation=self.activation_name,
                  output_activation=self.output_activation_name,
-                 allow_pickle=True) # Potrzebne do zapisu listy tablic
+                 allow_pickle=True) 
 
     def load_model(self, file_path):
         """Ładuje wagi, biasy i konfigurację z pliku .npz."""
