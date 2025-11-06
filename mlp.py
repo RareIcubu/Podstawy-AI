@@ -253,19 +253,37 @@ class MLP:
                  output_activation=self.output_activation_name,
                  allow_pickle=True) 
 
-    def load_model(self, file_path):
-        """Ładuje wagi, biasy i konfigurację z pliku .npz."""
+    @classmethod
+    def load_model(cls, file_path):
+        """
+        Ładuje model z pliku .npz, działając jak konstruktor klasy.
+        
+        Użycie: model = MLP.load_model("sciezka/do/pliku.npz")
+        """
         data = np.load(file_path, allow_pickle=True)
         
-        self.weights = data['weights']
-        self.biases = data['biases']
+        # 1. Odczytaj konfigurację z pliku
+        layer_sizes = data['layer_sizes']
+        if layer_sizes.ndim == 0:
+            layer_sizes = layer_sizes.item()
+        # Konwersja na listę Pythona na wszelki wypadek
+        layer_sizes = list(layer_sizes) 
+
+        # Użyj .item(), aby wyodrębnić stringi ze skalarów numpy
+        activation = data['activation'].item()
+        output_activation = data['output_activation'].item()
         
-        # Odtworzenie konfiguracji
-        self.layer_sizes = data['layer_sizes']
-        self.activation_name = data['activation']
-        self.output_activation_name = data['output_activation']
+        # 2. Stwórz nową instancję klasy (cls to odnośnik do MLP)
+        # Wywoła to __init__ i ustawi domyślne (losowe) wagi
+        model = cls(layer_sizes=layer_sizes,
+                    activation=activation,
+                    output_activation=output_activation)
         
-        # Ponowne przypisanie wskaźników do funkcji
-        self.activation_func, self.activation_derivative = self._activation_funcs[self.activation_name]
-        self.output_func = self._output_funcs[self.output_activation_name]
+        # 3. Nadpisz domyślne wagi tymi załadowanymi z pliku
+        model.weights = list(data['weights'])
+        model.biases = list(data['biases'])
+        
         print("Model załadowany pomyślnie.")
+        
+        # 4. Zwróć gotowy obiekt modelu
+        return model
