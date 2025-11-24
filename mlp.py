@@ -47,7 +47,7 @@ class MLP:
         # Zmienne do przechowywania stanów pośrednich (potrzebne do backpropagation)
         self.z = []  # Przechowuje wejścia liniowe (przed aktywacją)
         self.a = []  # Przechowuje wyjścia (po aktywacji)
-
+    
     # --- Inicjalizacja Wag ---
     
     def _initialize_weights(self):
@@ -100,7 +100,17 @@ class MLP:
         # Przesunięcie o max(z) zapobiega dużym liczbom w np.exp()
         exp_z = np.exp(z - np.max(z, axis=1, keepdims=True))
         return exp_z / np.sum(exp_z, axis=1, keepdims=True)
+# --- Funkcja Straty ---
 
+    def _compute_cross_entropy_loss(self,y_true, y_pred):
+        """Oblicza stratę entropii krzyżowej."""
+        m = y_true.shape[0]
+    
+    # Przycięcie wartości, aby uniknąć log(0)
+        y_pred_clipped = np.clip(y_pred, 1e-9, 1 - 1e-9)
+    
+        loss = -np.sum(y_true * np.log(y_pred_clipped)) / m
+        return loss
     # --- Propagacja do Przodu (Forward Propagation) ---
 
     def _forward(self, X):
@@ -133,19 +143,6 @@ class MLP:
             self.a.append(a_curr)
             
         return self.a[-1]
-
-    # --- Funkcja Straty ---
-
-    def _compute_cross_entropy_loss(self, y_true, y_pred):
-        """Oblicza stratę entropii krzyżowej."""
-        m = y_true.shape[0]  # Liczba próbek
-        
-        # Przycięcie wartości, aby uniknąć log(0) (stabilność numeryczna)
-        y_pred_clipped = np.clip(y_pred, 1e-9, 1 - 1e-9)
-        
-        # Wzór na entropię krzyżową: -sum(y_true * log(y_pred))
-        loss = -np.sum(y_true * np.log(y_pred_clipped)) / m
-        return loss
 
     # --- Propagacja Wsteczna (Backward Propagation) ---
 
@@ -286,4 +283,8 @@ class MLP:
         print("Model załadowany pomyślnie.")
         
         # 4. Zwróć gotowy obiekt modelu
-        return model
+        return 
+    
+    def read_data(file_path):
+        data = np.load(file_path, allow_pickle=True)
+        return data
