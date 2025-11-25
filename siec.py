@@ -28,12 +28,12 @@ class MLP:
             layer.backward(dz, self.learning_rate, m)
             if i > 0:
                 dz = dz_prev
-    
-    def fit(self, X, y, epochs):
+        
+    def fit(self, X, y, epochs=1000,print_every=500):
         loss_history = []
         for epoch in range(epochs):
             self.backward(X, y)
-            if epoch % 500 == 0:
+            if epoch % print_every == 0:
                 y_pred = self.forward(X)
                 loss = compute_cross_entropy_loss(y, y_pred)
                 loss_history.append(loss)

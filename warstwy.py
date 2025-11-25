@@ -1,6 +1,6 @@
 import numpy as np
 
-class WarstwaUkryta:
+class Warstwa:
     def __init__(self, input_size, layer_size, activation, activation_prime, weights_init='he'):
         self.input_size = input_size
         self.layer_size = layer_size
