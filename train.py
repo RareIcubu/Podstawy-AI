@@ -3,6 +3,7 @@ import warstwy as wr
 import funkcje as fa
 import numpy as np
 import minst as mn
+import mlp
 
 def create_model(input_size,output_size=10):
     model = sc.MLP(learning_rate=0.1)
@@ -20,7 +21,7 @@ def rozdzielenie_danych(dane):
         labels.append(temp)
     return np.array(dane_X), np.array(labels)
 
-dataset_treningowy = mn.create_dataset(rozmiar=200)
+dataset_treningowy = mn.create_dataset(rozmiar=300)
 dataset_treningowy = mn.mix_dataset(dataset_treningowy)
 dataset_testowy_1 = mn.mix_dataset(mn.create_dataset(rozmiar=50,start=200))
 dataset_testowy_2 = mn.mix_dataset(mn.create_dataset(rozmiar=50,start=250))
@@ -32,9 +33,13 @@ model = create_model(784)
 save_path = 'model_mnist.npz'
 dane_wejsciowe, labels = rozdzielenie_danych(dataset_treningowy)
 
-model.fit(dane_wejsciowe, labels, epochs=5000, print_every=500)
+model_stary = mlp.MLP([784, 128, 64, 10], learning_rate=0.1)
+model_stary.fit(dane_wejsciowe, labels, epochs=1000, print_every=500)
+model.fit(dane_wejsciowe, labels, epochs=1000, print_every=500)
 model.save_model(save_path)
 for i, test_set in enumerate([dataset_treningowy,dataset_testowy_1, dataset_testowy_2, dataset_testowy_3,dataset_testowy_wszystkie,dataset_testowy_pozostałe], start=1):
     test_X, test_y = rozdzielenie_danych(test_set)
     accuracy = model.evaluate(test_X, test_y)
-    print(f"Dokładność na zestawie testowym {i}: {accuracy * 100:.2f}%")
+    accuracy_stary = model_stary.evaluate(test_X, test_y)
+    print(f"Dokładność (stary model) na zestawie testowym {i}: {accuracy_stary * 100}%")
+    print(f"Dokładność na zestawie testowym {i}: {accuracy * 100}%")
