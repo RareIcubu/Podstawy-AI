@@ -3,53 +3,57 @@ import warstwy as wr
 import funkcje as fa
 import numpy as np
 import minst as mn
-import mlp
 import time
 
-def create_model(input_size,output_size=10):
-    model = sc.MLP(learning_rate=0.2)
-    model.add_layer(wr.Warstwa(input_size=input_size, layer_size=32, activation=fa.relu, activation_prime=fa.relu_derivative, weights_init='he'))
-    model.add_layer(wr.Warstwa(input_size=32, layer_size=16, activation=fa.relu, activation_prime=fa.relu_derivative, weights_init='he'))
-    model.add_layer(wr.Warstwa(input_size=16, layer_size=output_size, activation=fa.softmax, activation_prime=fa.derivative_one, weights_init='he'))
-    return model
-def rozdzielenie_danych(dane):
-    dane_X = []
-    labels = []
-    for i in range(len(dane)):
-        dane_X.append(dane[i][1])
-        temp = np.zeros(10)
-        temp[dane[i][0]] = 1
-        labels.append(temp)
-    return np.array(dane_X), np.array(labels)
+# --- 1. WCZYTANIE OFICJALNYCH DANYCH ---
+print("Wczytywanie danych...")
+# To trwa sekunde
+train_X, train_y = mn.get_training_data()
+test_X, test_y = mn.get_test_data()
 
-dataset_treningowy = mn.create_dataset(rozmiar=300)
-dataset_treningowy = mn.mix_dataset(dataset_treningowy)
-dataset_testowy_1 = mn.mix_dataset(mn.create_dataset(rozmiar=50,start=200))
-dataset_testowy_2 = mn.mix_dataset(mn.create_dataset(rozmiar=50,start=250))
-dataset_testowy_3 = mn.mix_dataset(mn.create_dataset(rozmiar=50,start=300))
-dataset_testowy_wszystkie = mn.mix_dataset(mn.create_dataset(rozmiar=1000))
-dataset_testowy_pozostałe = mn.mix_dataset(mn.create_dataset(rozmiar=800,start=200))
+print(f"Mamy {len(train_X)} przykładów. To wystarczy na >95%.")
+
+# --- 2. MODEL ---
+def create_model(input_size, output_size=10):
+    model = sc.MLP(learning_rate=0.1)
+    
+    # Architektura (Solidna)
+    model.add_layer(wr.Warstwa(input_size=input_size, layer_size=256, activation=fa.relu, activation_prime=fa.relu_derivative, weights_init='xavier'))
+    model.add_layer(wr.Warstwa(input_size=256, layer_size=128, activation=fa.relu, activation_prime=fa.relu_derivative, weights_init='xavier'))
+    model.add_layer(wr.Warstwa(input_size=128, layer_size=output_size, activation=fa.softmax, activation_prime=fa.derivative_one, weights_init='xavier'))
+    return model
 
 model = create_model(784)
-save_path = 'model_mnist.npz'
-dane_wejsciowe, labels = rozdzielenie_danych(dataset_treningowy)
 
+# --- 3. TRENING ---
+# Zwiększamy Batch Size do 128 lub 256. 
+# Im większy batch, tym mniej operacji Pythona, a więcej szybkiego NumPy.
+BATCH_SIZE = 128 
+EPOCHS = 5 
 
-model_stary = mlp.MLP([784, 32, 16, 10], learning_rate=0.2)
-start_time_1 = time.time()
-model_stary.fit(dane_wejsciowe, labels, epochs=500, print_every=10)
-end_time_1 = time.time()
-start_time_2 = time.time()
-model.fit(dane_wejsciowe, labels, epochs=500, print_every=10)
-end_time_2 = time.time()
+print(f"\nStart treningu (Batch: {BATCH_SIZE})...")
+start_time = time.time()
 
-print(f"Czas trenowania starego modelu: {end_time_1 - start_time_1} ms")
-print(f"Czas trenowania nowego modelu: {end_time_2 - start_time_2} ms")
-model.save_model(save_path)
+for epoch in range(EPOCHS):
+    # Prosty LR Decay
+    if epoch == 8:  model.learning_rate = 0.05
+    if epoch == 12: model.learning_rate = 0.01
 
-for i, test_set in enumerate([dataset_treningowy,dataset_testowy_1, dataset_testowy_2, dataset_testowy_3,dataset_testowy_wszystkie,dataset_testowy_pozostałe], start=1):
-    test_X, test_y = rozdzielenie_danych(test_set)
-    accuracy = model.evaluate(test_X, test_y)
-    accuracy_stary = model_stary.evaluate(test_X, test_y)
-    print(f"Dokładność (stary model) na zestawie testowym {i} : {accuracy_stary * 100}%")
-    print(f"Dokładność na zestawie testowym {i} : {accuracy * 100}%")
+    # Tasowanie (NumPy robi to błyskawicznie)
+    perm = np.random.permutation(len(train_X))
+    train_X = train_X[perm]
+    train_y = train_y[perm]
+
+    # Pętla treningowa
+    for i in range(0, len(train_X), BATCH_SIZE):
+        batch_X = train_X[i : i + BATCH_SIZE]
+        batch_y = train_y[i : i + BATCH_SIZE]
+        model.fit(batch_X, batch_y, epochs=1, print_every=0)
+
+    # Ewaluacja
+    acc = model.evaluate(test_X, test_y)
+    elapsed = time.time() - start_time
+    print(f"Epoka {epoch+1}/{EPOCHS} | Czas: {elapsed:.0f}s | Acc: {acc*100:.2f}%")
+
+model.save_model('model_mnist_fast.npz')
+print("\nGotowe. To nie powinno boleć.")

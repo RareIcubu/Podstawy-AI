@@ -29,16 +29,22 @@ class MLP:
             if i > 0:
                 dz = dz_prev
         
-    def fit(self, X, y, epochs=1000,print_every=500):
+    def fit(self, X, y, epochs=1000, print_every=500):
         loss_history = []
         for epoch in range(epochs):
             self.backward(X, y)
-            if epoch % print_every == 0:
+            
+            # --- POPRAWKA ---
+            # Sprawdzamy > 0 NA SAMYM POCZĄTKU.
+            # Jeśli print_every to 0, cała reszta linii jest ignorowana.
+            if print_every > 0 and epoch % print_every == 0:
                 y_pred = self.forward(X)
                 loss = compute_cross_entropy_loss(y, y_pred)
                 loss_history.append(loss)
-                print(f"Epoch {epoch+1}/{epochs}, Loss: {loss:.4f}")
-        return loss_history
+                print(f"Epoch {epoch}/{epochs}, Loss: {loss}")
+            # ----------------
+            
+        return loss_history    
     def predict_proba(self, X):
         y_pred = self.forward(X)
         return y_pred
