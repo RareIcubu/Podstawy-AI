@@ -82,7 +82,7 @@ class MLP:
 
     def _relu_derivative(self, z):
         # Zwraca 1.0 tam, gdzie z > 0, i 0.0 w przeciwnym razie
-        return (z > 0).astype(float)
+        return (z > 0).astype(float)    
 
     def _sigmoid(self, z):
         return 1 / (1 + np.exp(-z))

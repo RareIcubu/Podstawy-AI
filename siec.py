@@ -7,6 +7,10 @@ class MLP:
         self.learning_rate = learning_rate
 
     def add_layer(self, layer):
+        if len(self.layers) > 0:
+            prev_layer = self.layers[-1]
+            if layer.weights is None:
+                layer.set(prev_layer.layer_size)
         self.layers.append(layer)
 
     def forward(self, X):
@@ -29,10 +33,22 @@ class MLP:
             if i > 0:
                 dz = dz_prev
         
-    def fit(self, X, y, epochs=1000, print_every=500):
+    def fit(self, X, y, epochs=1000, print_every=500,batch_size=None):
         loss_history = []
+        n_samples = X.shape[0]
+
+        if batch_size is None:
+            batch_size = n_samples
+        
+        
         for epoch in range(epochs):
-            self.backward(X, y)
+            perm = np.random.permutation(len(X))
+            X_shuffled = X[perm]
+            y_shuffled = y[perm]
+            for i in range(0, n_samples, batch_size):
+                X_batch = X_shuffled[i:i + batch_size]
+                y_batch = y_shuffled[i:i + batch_size]
+                self.backward(X_batch, y_batch)
             
             # --- POPRAWKA ---
             # Sprawdzamy > 0 NA SAMYM POCZĄTKU.
@@ -42,6 +58,9 @@ class MLP:
                 loss = compute_cross_entropy_loss(y, y_pred)
                 loss_history.append(loss)
                 print(f"Epoch {epoch}/{epochs}, Loss: {loss}")
+                if loss < 0.001:
+                    print("Wczesne zatrzymanie: strata spadła poniżej 0.01")
+                    return loss_history
             # ----------------
             
         return loss_history    
