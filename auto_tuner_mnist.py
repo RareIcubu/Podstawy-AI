@@ -16,10 +16,10 @@ import losses
 DATA_PATH = "mnist_data/"  # Upewnij się, że ścieżka jest poprawna
 
 PARAM_GRID = {
-    "learning_rate": [0.1, 0.05, 0.01],
-    "hidden_layers": [[64], [128], [128, 64], [256, 128]],
-    "epochs": [5],
-    "batch_size": [64],
+    "learning_rate": [0.5,0.2,0.1, 0.05, 0.01],
+    "hidden_layers": [[64], [128], [256, 128], [128, 64],[64,32]],
+    "epochs": [5,10,15,20,30],
+    "batch_size": [16,32,64,128],
 }
 
 
@@ -76,6 +76,7 @@ def run_single_experiment(
     # --- ZMIANA: Ręczna pętla treningowa ---
     # Dzięki temu liczymy loss niezależnie od parametru verbose w bibliotece
     for epoch in range(epochs):
+        
         # Trenujemy 1 epokę
         model.fit(X_train, y_train, epochs=1, batch_size=batch_size, verbose=False)
 
@@ -115,7 +116,7 @@ def main():
     print(f"\nZnaleziono {len(experiments)} kombinacji do przetestowania.")
     print("-" * 80)
     print(
-        f"{'ID':<4} | {'LR':<6} | {'Architektura':<20} | {'Czas [s]':<8} | {'Accuracy %':<10}"
+        f"{'ID':<4} | {'LR':<6} | {'Architektura':<20} |{'Epoki':<6} | {'Czas [s]':<8} | {'Accuracy %':<10}"
     )
     print("-" * 80)
 
@@ -133,6 +134,8 @@ def main():
             "id": i,
             "lr": lr,
             "layers": str(struct),
+            "epochs": epochs,     
+            "batch_size": bs,
             "accuracy": acc,
             "duration": duration,
             "history": hist,
@@ -140,7 +143,7 @@ def main():
         results.append(res_entry)
 
         print(
-            f"{i:<4} | {lr:<6} | {str(struct):<20} | {duration:<8.2f} | {acc * 100:.2f}%"
+            f"{i:<4} | {lr:<6} | {str(struct):<20} | {epochs:<6} | {duration:<8.2f} | {acc * 100:.2f}%"
         )
 
     # --- RAPORT ---
@@ -153,12 +156,12 @@ def main():
     df_display = df_sorted.copy()
     df_display["accuracy"] = df_display["accuracy"].apply(lambda x: f"{x * 100:.2f}%")
     print(
-        df_display[["id", "lr", "layers", "accuracy", "duration"]].to_string(
+        df_display[["id", "lr", "layers","epochs","batch_size", "accuracy", "duration"]].to_string(
             index=False
         )
     )
 
-    plot_mnist_results(df_sorted, results)
+    plot_mnist_results(df_sorted[:10], results)  
 
 
 def plot_mnist_results(df, all_results):

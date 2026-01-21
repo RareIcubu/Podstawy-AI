@@ -28,7 +28,7 @@ PARAM_GRID = {
 def get_data():
     print("Generowanie danych (Ackley)...")
     # 10k próbek do szybkiego testu (do finalnego tuningu można dać 20k)
-    X_raw = np.random.uniform(-2, 2, (10000, 2))
+    X_raw = np.random.uniform(-2, 2, (20000, 2))
     
     # Feature Engineering (x, y, cos(x), cos(y)) - to co działało najlepiej
     X_train = np.column_stack([
