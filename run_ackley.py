@@ -75,8 +75,8 @@ for epoch in range(EPOCHS):
     if epoch % 100 == 0:
         print(f"Epoch {epoch}/{EPOCHS}, Loss: {loss:.6f}")
 # 5. Wizualizacja
-print("Rysowanie...")
-x = np.linspace(-2, 2, 100)
+print("Rysowanie i zapisywanie do Ackley.png...")
+x = np.linspace(-2, 2, 100) # Mniejsza siatka do wizualizacji 3D dla czytelności
 y = np.linspace(-2, 2, 100)
 X_grid, Y_grid = np.meshgrid(x, y)
 
@@ -94,23 +94,31 @@ Z_true = ackley(X_grid, Y_grid)
 Z_pred = model.predict(X_flat_expanded).reshape(X_grid.shape) * y_max 
 
 # Wykresy
-plt.figure(figsize=(15, 5))
+fig = plt.figure(figsize=(18, 6))
 
-plt.subplot(1, 3, 1)
-plt.title("Oryginał")
-plt.contourf(X_grid, Y_grid, Z_true, levels=50, cmap='viridis')
-plt.colorbar()
+# 1. Oryginał 3D
+ax1 = fig.add_subplot(1, 3, 1, projection='3d')
+ax1.plot_surface(X_grid, Y_grid, Z_true, cmap='viridis', alpha=0.8)
+ax1.set_title("Oryginał (3D)")
+ax1.set_xlabel('x1')
+ax1.set_ylabel('x2')
 
-plt.subplot(1, 3, 2)
-plt.title("Sieć (Po tuningu)")
-plt.contourf(X_grid, Y_grid, Z_pred, levels=50, cmap='viridis')
-plt.colorbar()
+# 2. Aproksymacja 3D
+ax2 = fig.add_subplot(1, 3, 2, projection='3d')
+ax2.plot_surface(X_grid, Y_grid, Z_pred, cmap='viridis', alpha=0.8)
+ax2.set_title("Sieć MLP (3D)")
+ax2.set_xlabel('x1')
+ax2.set_ylabel('x2')
 
-plt.subplot(1, 3, 3)
-plt.title("Loss (zauważ schodki przy zmianie LR)")
-plt.plot(history)
-plt.yscale('log')
-plt.grid()
+# 3. Wykres błędu (Loss)
+ax3 = fig.add_subplot(1, 3, 3)
+ax3.plot(history)
+ax3.set_title("Funkcja straty (MSE)")
+ax3.set_xlabel("Epoka")
+ax3.set_yscale('log')
+ax3.grid(True)
 
 plt.tight_layout()
-plt.show()
+plt.savefig('ackley_result.png')
+print("Wykres zapisano do pliku ackley_result.png")
+# plt.show()

@@ -29,9 +29,12 @@ class MLP:
             output = layer.forward(output)
         return output
 
-    def fit(self, X, y, epochs, batch_size=32, verbose=True):
-        history = []
+    def fit(self, X, y, epochs, batch_size=32, validation_data=None, patience=None, verbose=True):
+        history = {'loss': [], 'val_loss': []}
         m = X.shape[0]
+        
+        best_loss = np.inf
+        wait = 0
         
         for epoch in range(epochs):
             # Tasowanie
@@ -52,14 +55,37 @@ class MLP:
                 for layer in reversed(self.layers):
                     error = layer.backward(error, self.learning_rate)
 
-            # Raportowanie
+            # Raportowanie i Walidacja
+            # Obliczamy stratę na zbiorze treningowym
+            sample_pred = self.forward(X)
+            loss = self.loss_func(y, sample_pred)
+            history['loss'].append(loss)
+            
+            val_loss = None
+            if validation_data is not None:
+                X_val, y_val = validation_data
+                val_pred = self.forward(X_val)
+                val_loss = self.loss_func(y_val, val_pred)
+                history['val_loss'].append(val_loss)
+            
             if verbose:
-                # Sprawdzamy błąd na próbce danych (nie całych, żeby było szybciej)
-                # lub na całym zbiorze (dokładniej)
-                sample_pred = self.forward(X)
-                loss = self.loss_func(y, sample_pred)
-                history.append(loss)
-                print(f"Epoch {epoch+1}/{epochs}, Loss: {loss:.4f}")
+                msg = f"Epoch {epoch+1}/{epochs}, Loss: {loss:.4f}"
+                if val_loss is not None:
+                    msg += f", Val Loss: {val_loss:.4f}"
+                print(msg)
+            
+            # Early Stopping
+            if patience is not None:
+                current_loss = val_loss if val_loss is not None else loss
+                if current_loss < best_loss:
+                    best_loss = current_loss
+                    wait = 0
+                else:
+                    wait += 1
+                    if wait >= patience:
+                        if verbose:
+                            print(f"Early stopping at epoch {epoch+1}")
+                        break
         
         return history
 

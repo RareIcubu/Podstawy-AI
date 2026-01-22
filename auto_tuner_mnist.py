@@ -5,7 +5,6 @@ import itertools
 import time
 import os
 
-# Import Twojej biblioteki
 import utils
 from network import MLP
 from layers import Dense
@@ -13,52 +12,55 @@ import activations as act
 import losses
 
 # --- KONFIGURACJA EKSPERYMENTU ---
-DATA_PATH = "mnist_data/"  # Upewnij się, że ścieżka jest poprawna
+DATA_PATH = "mnist_data/"
 
+# Rozszerzona siatka parametrów zgodnie z prośbą
 PARAM_GRID = {
     "learning_rate": [0.1, 0.05, 0.01],
     "hidden_layers": [[64], [128], [128, 64], [256, 128]],
-    "epochs": [5],
-    "batch_size": [64],
+    "epochs": [5, 10],      # Dodane
+    "batch_size": [32, 64]  # Dodane
 }
 
-
-# 1. Funkcja pomocnicza do liczenia dokładności
 def calculate_accuracy(model, X, y_true):
     y_true_indices = np.argmax(y_true, axis=1)
     probs = model.predict(X)
     y_pred_indices = np.argmax(probs, axis=1)
     return np.mean(y_pred_indices == y_true_indices)
 
-
-# 2. Wczytanie danych
 def get_data():
     print("Wczytywanie danych MNIST...")
-    img_path = os.path.join(DATA_PATH, "train-images-idx3-ubyte.gz")
-    lbl_path = os.path.join(DATA_PATH, "train-labels-idx1-ubyte.gz")
-    test_img_path = os.path.join(DATA_PATH, "t10k-images-idx3-ubyte.gz")
-    test_lbl_path = os.path.join(DATA_PATH, "t10k-labels-idx1-ubyte.gz")
+    # Ścieżki do plików .gz (muszą być w folderze mnist_data/)
+    paths = {
+        'train_img': os.path.join(DATA_PATH, "train-images-idx3-ubyte.gz"),
+        'train_lbl': os.path.join(DATA_PATH, "train-labels-idx1-ubyte.gz"),
+        'test_img':  os.path.join(DATA_PATH, "t10k-images-idx3-ubyte.gz"),
+        'test_lbl':  os.path.join(DATA_PATH, "t10k-labels-idx1-ubyte.gz")
+    }
 
-    if not os.path.exists(img_path):
-        raise FileNotFoundError(f"Nie znaleziono plików w folderze {DATA_PATH}")
+    for name, p in paths.items():
+        if not os.path.exists(p):
+            raise FileNotFoundError(f"Brak pliku: {p}")
 
-    X_train = utils.load_mnist_images(img_path)
-    y_train = utils.load_mnist_labels(lbl_path)
-    X_test = utils.load_mnist_images(test_img_path)
-    y_test = utils.load_mnist_labels(test_lbl_path)
+    X_full = utils.load_mnist_images(paths['train_img'])
+    y_full = utils.load_mnist_labels(paths['train_lbl'])
+    X_test = utils.load_mnist_images(paths['test_img'])
+    y_test = utils.load_mnist_labels(paths['test_lbl'])
+    
+    # Walidacja (10k)
+    val_size = 10000
+    X_train = X_full[:-val_size]
+    y_train = y_full[:-val_size]
+    X_val = X_full[-val_size:]
+    y_val = y_full[-val_size:]
 
-    return X_train, y_train, X_test, y_test
+    print(f"Dane: Train={len(X_train)}, Val={len(X_val)}, Test={len(X_test)}")
+    return X_train, y_train, X_val, y_val, X_test, y_test
 
-
-# 3. Pojedynczy eksperyment (POPRAWIONY)
-def run_single_experiment(
-    X_train, y_train, X_test, y_test, lr, layers_struct, epochs, batch_size
-):
+def run_single_experiment(X_train, y_train, X_val, y_val, lr, layers_struct, epochs, batch_size):
     input_dim = 784
-
     model = MLP(learning_rate=lr)
 
-    # Budowanie warstw
     first = True
     for size in layers_struct:
         if first:
@@ -71,133 +73,115 @@ def run_single_experiment(
     model.compile(losses.cross_entropy_loss, losses.cross_entropy_prime)
 
     start_time = time.time()
-    loss_history = []
-
-    # --- ZMIANA: Ręczna pętla treningowa ---
-    # Dzięki temu liczymy loss niezależnie od parametru verbose w bibliotece
-    for epoch in range(epochs):
-        # Trenujemy 1 epokę
-        model.fit(X_train, y_train, epochs=1, batch_size=batch_size, verbose=False)
-
-        # Ręcznie obliczamy stratę na podzbiorze danych (żeby było szybko)
-        # Bierzemy losowe 2000 próbek do estymacji błędu
-        indices = np.random.choice(len(X_train), 2000, replace=False)
-        X_sample = X_train[indices]
-        y_sample = y_train[indices]
-
-        y_pred = model.predict(X_sample)
-        loss = losses.cross_entropy_loss(y_sample, y_pred)
-        loss_history.append(loss)
-
+    
+    # Wykorzystanie parametrow epochs i batch_size
+    history = model.fit(
+        X_train, y_train, 
+        epochs=epochs, 
+        batch_size=batch_size, 
+        validation_data=(X_val, y_val),
+        verbose=False
+    )
+    
     duration = time.time() - start_time
-
-    # Ewaluacja końcowa na zbiorze testowym
-    final_acc = calculate_accuracy(model, X_test, y_test)
-
-    return final_acc, loss_history, duration
-
-
-# --- GŁÓWNA PĘTLA ---
-
+    val_acc = calculate_accuracy(model, X_val, y_val)
+    
+    return val_acc, history['loss'], duration
 
 def main():
     try:
-        X_train, y_train, X_test, y_test = get_data()
+        X_train, y_train, X_val, y_val, X_test, y_test = get_data()
     except Exception as e:
-        print(f"Błąd wczytywania danych: {e}")
+        print(f"Błąd: {e}")
         return
-
-    results = []
 
     keys, values = zip(*PARAM_GRID.items())
     experiments = [dict(zip(keys, v)) for v in itertools.product(*values)]
 
-    print(f"\nZnaleziono {len(experiments)} kombinacji do przetestowania.")
-    print("-" * 80)
-    print(
-        f"{'ID':<4} | {'LR':<6} | {'Architektura':<20} | {'Czas [s]':<8} | {'Accuracy %':<10}"
-    )
-    print("-" * 80)
+    print(f"\nLiczba kombinacji: {len(experiments)}")
+    
+    # Otwieramy plik do logowania wyników
+    with open("mnist_tuning_log.txt", "w") as log_file:
+        header = f"{'ID':<4} | {'LR':<6} | {'Layers':<20} | {'Ep':<3} | {'BS':<4} | {'Time[s]':<7} | {'ValAcc%':<8}"
+        print("-" * 80)
+        print(header)
+        print("-" * 80)
+        log_file.write(header + "\n")
+        log_file.write("-" * 80 + "\n")
 
-    for i, params in enumerate(experiments):
-        lr = params["learning_rate"]
-        struct = params["hidden_layers"]
-        epochs = params["epochs"]
-        bs = params["batch_size"]
+        results = []
 
-        acc, hist, duration = run_single_experiment(
-            X_train, y_train, X_test, y_test, lr, struct, epochs, bs
-        )
+        for i, p in enumerate(experiments):
+            lr = p["learning_rate"]
+            struct = p["hidden_layers"]
+            ep = p["epochs"]
+            bs = p["batch_size"]
 
-        res_entry = {
-            "id": i,
-            "lr": lr,
-            "layers": str(struct),
-            "accuracy": acc,
-            "duration": duration,
-            "history": hist,
-        }
-        results.append(res_entry)
+            acc, hist, duration = run_single_experiment(
+                X_train, y_train, X_val, y_val, lr, struct, ep, bs
+            )
 
-        print(
-            f"{i:<4} | {lr:<6} | {str(struct):<20} | {duration:<8.2f} | {acc * 100:.2f}%"
-        )
+            res_entry = {
+                "id": i,
+                "lr": lr,
+                "layers": str(struct),
+                "epochs": ep,
+                "batch_size": bs,
+                "accuracy": acc,
+                "duration": duration,
+                "history": hist
+            }
+            results.append(res_entry)
 
-    # --- RAPORT ---
+            # Log do konsoli
+            line = f"{i:<4} | {lr:<6} | {str(struct):<20} | {ep:<3} | {bs:<4} | {duration:<7.2f} | {acc * 100:.2f}%"
+            print(line)
+            
+            # Log do pliku (flush=True dla bezpieczeństwa)
+            log_file.write(line + "\n")
+            log_file.flush()
+
+    # Sortowanie i wykresy
     df = pd.DataFrame(results)
     df_sorted = df.sort_values(by="accuracy", ascending=False)
 
-    print("\n" + "=" * 30)
-    print(" RANKING WYNIKÓW (MNIST)")
-    print("=" * 30)
-    df_display = df_sorted.copy()
-    df_display["accuracy"] = df_display["accuracy"].apply(lambda x: f"{x * 100:.2f}%")
-    print(
-        df_display[["id", "lr", "layers", "accuracy", "duration"]].to_string(
-            index=False
-        )
-    )
+    print("\nTOP 5 WYNIKÓW:")
+    print(df_sorted[["id", "lr", "layers", "epochs", "batch_size", "accuracy"]].head(5).to_string(index=False))
 
-    plot_mnist_results(df_sorted, results)
+    plot_mnist_results(df_sorted)
 
-
-def plot_mnist_results(df, all_results):
+def plot_mnist_results(df):
     plt.style.use("bmh")
-
     fig, axes = plt.subplots(1, 2, figsize=(16, 6))
 
-    # Wykres 1: Accuracy
-    labels = [f"LR={r['lr']}\n{r['layers']}" for _, r in df.iterrows()]
-    accs = df["accuracy"].values * 100
+    # 1. Bar chart (Top 10)
+    top_10 = df.head(10)
+    labels = [f"ID {r['id']}\nLR={r['lr']} L={r['layers']}" for _, r in top_10.iterrows()]
+    accs = top_10["accuracy"].values * 100
 
     axes[0].barh(range(len(accs)), accs, color="royalblue")
     axes[0].set_yticks(range(len(accs)))
-    axes[0].set_yticklabels(labels, fontsize=9)
+    axes[0].set_yticklabels(labels, fontsize=8)
     axes[0].invert_yaxis()
-    axes[0].set_xlabel("Accuracy [%] (Więcej = Lepiej)")
-    axes[0].set_title("Dokładność modeli na zbiorze testowym")
-    # Skalowanie osi X, żeby było widać różnice
-    min_acc = max(0, min(accs) - 5)
-    axes[0].set_xlim(min_acc, 100)
+    axes[0].set_title("Top 10 Konfiguracji (Accuracy)")
+    axes[0].set_xlabel("%")
+    
+    # Skalowanie osi X "zoom"
+    if len(accs) > 0:
+        axes[0].set_xlim(min(accs)-1, 100)
 
-    # Wykres 2: Loss History
-    axes[1].set_title("Spadek funkcji kosztu (Top 3 modele)")
-    axes[1].set_xlabel("Epoka")
-    axes[1].set_ylabel("Cross Entropy Loss")
-
-    top_3 = df.iloc[:3]
-
+    # 2. Loss History (Top 3)
+    top_3 = df.head(3)
     for _, row in top_3.iterrows():
-        hist = next(r["history"] for r in all_results if r["id"] == row["id"])
-        label = f"ID {row['id']}: {row['layers']} (Acc: {row['accuracy'] * 100:.1f}%)"
-        axes[1].plot(hist, label=label, linewidth=2)
-
+        axes[1].plot(row["history"], label=f"ID {row['id']} (Acc: {row['accuracy']*100:.1f}%)")
+    
+    axes[1].set_title("Loss History (Top 3)")
+    axes[1].set_yscale('log')
     axes[1].legend()
-    axes[1].grid(True)
 
     plt.tight_layout()
-    plt.show()
-
+    plt.savefig("mnist_tuning_results.png")
+    print("\nZapisano wykres zbiorczy do: mnist_tuning_results.png")
 
 if __name__ == "__main__":
     main()
